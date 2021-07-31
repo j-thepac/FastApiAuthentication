@@ -11,8 +11,6 @@ If the token contains foobar, the content of the Authorization header would be: 
 
 """
 
-
-
 import uvicorn
 from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
@@ -26,33 +24,27 @@ db = {
         "disabled": False,
     }
 }
-# if your API was located at https://example.com/, then it would refer to https://example.com/token
-#call @app.post("/token") below
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 class User(BaseModel):
     username: str
     hashed_password: str
     disabled:bool
 
-async def validate_user(token: str = Depends(oauth2_scheme)):
-    if token not in db:
-        raise HTTPException(status_code=400, detail="Invalid authentication credentials")
-    user=User(**db[token])
-    if user.disabled:
-        raise HTTPException(status_code=400, detail="Invalid user")
-    return user
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token") #https://example.com/ >  https://example.com/token
 
 @app.post("/token")
 async def login(form_data: OAuth2PasswordRequestForm=Depends()):
     usn=form_data.username
-    validate_user(usn)
+    if usn not in db:
+        raise HTTPException(status_code=400, detail="Invalid authentication credentials")
+    user=User(**db[usn])
+    if user.disabled:
+        raise HTTPException(status_code=400, detail="Invalid user")
     if "hashed"+form_data.password!= db[usn]["hashed_password"]:
         raise HTTPException(status_code=400, detail="Incorrect password")
     return {"access_token": usn, "token_type": "bearer"}
 
-@app.get("/users/me")
-async def read_users_me(current_user: User = Depends(validate_user)):
-    return current_user
+@app.get("/resource1")
+async def endpoint1(current_user: User = Depends(oauth2_scheme)): return "reached resource1"
 
 if __name__ == "__main__":uvicorn.run(app, host="0.0.0.0", port=9000)
